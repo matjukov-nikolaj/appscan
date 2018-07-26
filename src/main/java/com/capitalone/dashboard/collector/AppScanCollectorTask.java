@@ -2,7 +2,6 @@ package com.capitalone.dashboard.collector;
 
 import com.capitalone.dashboard.model.*;
 import com.capitalone.dashboard.repository.*;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -53,13 +52,14 @@ public class AppScanCollectorTask extends CollectorTask<AppScanCollector> {
     }
 
     @Override
+
     public String getCron() {
         return appScanSettings.getCron();
     }
 
     @Override
     public void collect(AppScanCollector collector) {
-        if (collector.getBlackDuckServer().isEmpty()) {
+        if (collector.getAppScanServer().isEmpty()) {
             return;
         }
         Set<ObjectId> udId = new HashSet<>();
@@ -67,7 +67,7 @@ public class AppScanCollectorTask extends CollectorTask<AppScanCollector> {
         List<AppScanProject> existingProjects = appScanProjectRepository.findByCollectorIdIn(udId);
         clean(collector, existingProjects);
 
-        String instanceUrl = collector.getBlackDuckServer();
+        String instanceUrl = collector.getAppScanServer();
         appScanClient.parseDocument(instanceUrl);
         AppScanProject project = appScanClient.getProject();
         logBanner("Fetched project: " + project.getProjectName());
@@ -89,6 +89,10 @@ public class AppScanCollectorTask extends CollectorTask<AppScanCollector> {
     }
 
     private void refreshData(AppScanProject project) {
+        if (project == null)
+        {
+            return;
+        }
         AppScan appScan = appScanClient.getCurrentMetrics(project);
         if (appScan != null && isNewData(project, appScan)) {
             appScan.setCollectorItemId(project.getId());
@@ -97,7 +101,7 @@ public class AppScanCollectorTask extends CollectorTask<AppScanCollector> {
     }
 
     private AppScanProject enabledProject(AppScanCollector collector, AppScanProject project) {
-        return appScanProjectRepository.findBlackDuckProject(collector.getId(), project.getProjectName(), project.getProjectTimestamp());
+        return appScanProjectRepository.findAppScanProject(collector.getId(), project.getProjectName(), project.getProjectTimestamp());
     }
 
     private boolean isNewData(AppScanProject project, AppScan appScan) {

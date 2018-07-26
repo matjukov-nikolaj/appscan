@@ -2,16 +2,18 @@ package com.capitalone.dashboard.collector;
 
 import com.capitalone.dashboard.model.AppScanProject;
 import com.capitalone.dashboard.model.AppScan;
-import codesecurity.collector.DefaultCodeSecurityClient;
+import codesecurity.collectors.collector.DefaultCodeSecurityClient;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.*;
 
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
-@Component("DefaultBlackDuckClient")
+@Component("DefaultAppScanClient")
 public class DefaultAppScanClient extends DefaultCodeSecurityClient<AppScan, AppScanProject> {
     private static final Log LOG = LogFactory.getLog(DefaultAppScanClient.class);
 
@@ -20,10 +22,10 @@ public class DefaultAppScanClient extends DefaultCodeSecurityClient<AppScan, App
     private static final String MEDIUM = "TotalMediumSeverityIssues";
     private static final String HIGH = "TotalHighSeverityIssues";
     private static final String TOTAL = "Total";
-    private static final String XML_REPORT = "XmlReport ";
+    private static final String XML_REPORT = "XmlReport";
     private static final String DATE_FORMAT = "EEE MMM dd HH:mm:ss zzz yyyy";
+    private static final String PROJECT_NAME = "Name";
 
-    //Mon Jul 23 15:18:46 MSK 2018
     private AppScan appScan;
     private AppScanProject project;
     private Map<String, String> metrics = new HashMap<>();
@@ -40,6 +42,10 @@ public class DefaultAppScanClient extends DefaultCodeSecurityClient<AppScan, App
     @Override
     public AppScan getCurrentMetrics(AppScanProject project) {
         return this.appScan;
+    }
+
+    public void setSettings(AppScanSettings settings) {
+        this.settings = settings;
     }
 
     protected void setInstanceUrlInProject(String instanceUrl) {
@@ -59,10 +65,9 @@ public class DefaultAppScanClient extends DefaultCodeSecurityClient<AppScan, App
     }
 
     protected void parseCodeSecurityDocument(Document document) {
-        try {
-        } catch (Exception e) {
-            LOG.error(e);
-        }
+        parseProject(document);
+        parseMetrics(document);
+        setAppScanMetrics();
     }
 
     protected void initializationFields() {
@@ -75,15 +80,43 @@ public class DefaultAppScanClient extends DefaultCodeSecurityClient<AppScan, App
         this.metrics.put(TOTAL, "");
     }
 
-    private void setBlackDuckMetrics() {
+    private void setAppScanMetrics() {
         this.appScan.setName(project.getProjectName());
         this.appScan.setMetrics(this.metrics);
         this.appScan.setUrl(project.getInstanceUrl());
         this.appScan.setTimestamp(Long.parseLong(project.getProjectTimestamp(), 10));
     }
 
-    public void setSettings(AppScanSettings settings) {
-        this.settings = settings;
+    private void parseProject(Document document) {
+        NodeList xmlReportTag = document.getElementsByTagName(XML_REPORT);
+        String name = getValueOfNodeAttribute(xmlReportTag, PROJECT_NAME);
+        String currentDate = getCurrentDate();
+        this.project.setProjectName(getProjectName(name, currentDate));
+        this.project.setProjectTimestamp(Long.toString(getTimeStamp(currentDate)));
     }
 
+    private void parseMetrics(Document document) {
+        this.metrics.put(INFORMATIONAL, getValueOfTag(INFORMATIONAL, document));
+        this.metrics.put(LOW, getValueOfTag(LOW, document));
+        this.metrics.put(MEDIUM, getValueOfTag(MEDIUM, document));
+        this.metrics.put(HIGH, getValueOfTag(HIGH, document));
+        this.metrics.put(TOTAL, getValueOfTag(TOTAL, document));
+    }
+
+    public String getCurrentDate() {
+        DateFormat dateFormat = new SimpleDateFormat(getDateFormat(), Locale.ENGLISH);
+        Date date = new Date();
+        return dateFormat.format(date);
+    }
+
+    private String getValueOfTag(String tagName, Document document) {
+        NodeList tag = document.getElementsByTagName(tagName);
+        Node tagNode = tag.item(0);
+        return tagNode.getFirstChild().getNodeValue();
+    }
+
+    private String getValueOfNodeAttribute(NodeList xmlReportTag, String itemName) {
+        Node node = xmlReportTag.item(0);
+        return node.getAttributes().getNamedItem(itemName).getNodeValue();
+    }
 }

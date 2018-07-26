@@ -5,7 +5,7 @@ import java.util.Map;
 
 public class AppScanCollector extends Collector {
     private String appScanServer = "";
-    public String getBlackDuckServer() {
+    public String getAppScanServer() {
         return appScanServer;
     }
 

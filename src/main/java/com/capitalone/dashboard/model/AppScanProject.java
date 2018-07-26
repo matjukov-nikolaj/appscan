@@ -1,8 +1,9 @@
 package com.capitalone.dashboard.model;
 
-import codesecurity.model.CodeSecurityProject;
+import codesecurity.collectors.model.CodeSecurityProject;
 
 public class AppScanProject extends CodeSecurityProject {
+
     public static final String PROJECT_TIMESTAMP = "projectTimestamp";
 
     public String getProjectTimestamp() { return (String) getOptions().get(PROJECT_TIMESTAMP); }
