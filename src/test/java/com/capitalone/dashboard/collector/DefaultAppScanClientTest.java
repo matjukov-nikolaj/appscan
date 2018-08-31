@@ -7,8 +7,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
+import codesecurity.config.Constants;
 
 import java.util.Map;
+
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.Assert.*;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -27,6 +30,8 @@ public class DefaultAppScanClientTest {
     private static final String HIGH = "TotalHighSeverityIssues";
     private static final String TOTAL = "Total";
     private static final String NAME = "test";
+    private static final String DATE = "2018-8-25";
+    private static final Long TIMESTAMP = (Long) 1535185027000L;
 
     @Before
     public void init() {
@@ -43,9 +48,9 @@ public class DefaultAppScanClientTest {
     public void canGetProjects() {
         appScanClient.parseDocument(settings.getServer());
         AppScanProject project = appScanClient.getProject();
-        StringBuilder name = new StringBuilder(project.getProjectName());
-        name.replace(4, name.length(), "");
-        assertEquals(name.toString(), NAME);
+        assertEquals(project.getProjectName(), NAME);
+        assertEquals(project.getProjectTimestamp(), TIMESTAMP);
+        assertEquals(project.getProjectDate(), DATE);
     }
 
     @Test
@@ -53,12 +58,12 @@ public class DefaultAppScanClientTest {
         appScanClient.parseDocument(settings.getServer());
         AppScanProject project = appScanClient.getProject();
         AppScan appScan = appScanClient.getCurrentMetrics(project);
-        Map<String, String> metrics = appScan.getMetrics();
-        assertEquals("10", metrics.get(LOW));
-        assertEquals("0", metrics.get(MEDIUM));
-        assertEquals("0", metrics.get(HIGH));
-        assertEquals("19", metrics.get(TOTAL));
-        assertEquals("9", metrics.get(INFORMATIONAL));
+        Map<String, Integer> metrics = appScan.getMetrics();
+        assertThat(metrics.get(Constants.AppScan.LOW)).isEqualTo(1);
+        assertThat(metrics.get(Constants.AppScan.MEDIUM)).isEqualTo(1);
+        assertThat(metrics.get(Constants.AppScan.HIGH)).isEqualTo(1);
+        assertThat(metrics.get(Constants.AppScan.INFORMATIONAL)).isEqualTo(1);
+        assertThat(metrics.get(Constants.AppScan.TOTAL)).isEqualTo(4);
     }
 
     @Test

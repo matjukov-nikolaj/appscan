@@ -3,32 +3,23 @@ package com.capitalone.dashboard.collector;
 import com.capitalone.dashboard.model.AppScanProject;
 import com.capitalone.dashboard.model.AppScan;
 import codesecurity.collectors.collector.DefaultCodeSecurityClient;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import codesecurity.config.Constants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.*;
-
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.*;
 
 @Component("DefaultAppScanClient")
 public class DefaultAppScanClient extends DefaultCodeSecurityClient<AppScan, AppScanProject> {
-    private static final Log LOG = LogFactory.getLog(DefaultAppScanClient.class);
-
-    private static final String INFORMATIONAL = "TotalInformationalIssues";
-    private static final String LOW = "TotalLowSeverityIssues";
-    private static final String MEDIUM = "TotalMediumSeverityIssues";
-    private static final String HIGH = "TotalHighSeverityIssues";
-    private static final String TOTAL = "Total";
-    private static final String XML_REPORT = "XmlReport";
-    private static final String DATE_FORMAT = "EEE MMM dd HH:mm:ss zzz yyyy";
-    private static final String PROJECT_NAME = "Name";
+    private static final String XML_REPORT = "xml-report";
+    private static final String DATE_FORMAT = "M/dd/yyyy HH:mm:ss a";
+    private static final String PROJECT_NAME = "name";
+    private static final String ISSUES_COUNT = "issues-count";
+    private static final String SCAN_DATE = "scan-date-and-time";
 
     private AppScan appScan;
     private AppScanProject project;
-    private Map<String, String> metrics = new HashMap<>();
+    private Map<String, Integer> metrics = new HashMap<>();
     private AppScanSettings settings;
 
     @Autowired
@@ -73,50 +64,80 @@ public class DefaultAppScanClient extends DefaultCodeSecurityClient<AppScan, App
     protected void initializationFields() {
         this.project = new AppScanProject();
         this.appScan = new AppScan();
-        this.metrics.put(INFORMATIONAL, "");
-        this.metrics.put(LOW, "");
-        this.metrics.put(MEDIUM, "");
-        this.metrics.put(HIGH, "");
-        this.metrics.put(TOTAL, "");
+        this.metrics.put(Constants.AppScan.INFORMATIONAL, 0);
+        this.metrics.put(Constants.AppScan.LOW, 0);
+        this.metrics.put(Constants.AppScan.MEDIUM, 0);
+        this.metrics.put(Constants.AppScan.HIGH, 0);
+        this.metrics.put(Constants.AppScan.TOTAL, 0);
     }
 
     private void setAppScanMetrics() {
         this.appScan.setName(project.getProjectName());
         this.appScan.setMetrics(this.metrics);
         this.appScan.setUrl(project.getInstanceUrl());
-        this.appScan.setTimestamp(Long.parseLong(project.getProjectTimestamp(), 10));
+        this.appScan.setTimestamp(project.getProjectTimestamp());
     }
 
     private void parseProject(Document document) {
         NodeList xmlReportTag = document.getElementsByTagName(XML_REPORT);
-        String name = getValueOfNodeAttribute(xmlReportTag, PROJECT_NAME);
-        String currentDate = getCurrentDate();
-        this.project.setProjectName(getProjectName(name, currentDate));
-        this.project.setProjectTimestamp(Long.toString(getTimeStamp(currentDate)));
+        String name = getValueOfNodeAttribute(xmlReportTag.item(0), PROJECT_NAME);
+        String scanDate = getScanDate(document);
+        this.project.setProjectName(name);
+        this.project.setProjectTimestamp(getTimeStamp(scanDate));
+        this.project.setProjectDate(getProjectDate(scanDate));
     }
 
     private void parseMetrics(Document document) {
-        this.metrics.put(INFORMATIONAL, getValueOfTag(INFORMATIONAL, document));
-        this.metrics.put(LOW, getValueOfTag(LOW, document));
-        this.metrics.put(MEDIUM, getValueOfTag(MEDIUM, document));
-        this.metrics.put(HIGH, getValueOfTag(HIGH, document));
-        this.metrics.put(TOTAL, getValueOfTag(TOTAL, document));
+        NodeList nodesWithIssues = document.getElementsByTagName(ISSUES_COUNT);
+        for (int i = 0; i < nodesWithIssues.getLength(); ++i) {
+            Node node = nodesWithIssues.item(i);
+            NamedNodeMap attributes = node.getAttributes();
+            parseNodeAttributes(attributes);
+        }
     }
 
-    public String getCurrentDate() {
-        DateFormat dateFormat = new SimpleDateFormat(getDateFormat(), Locale.ENGLISH);
-        Date date = new Date();
-        return dateFormat.format(date);
+    private void parseNodeAttributes(NamedNodeMap attributes) {
+        for (int j = 0; j < attributes.getLength(); ++j) {
+            Node attribute = attributes.item(j);
+            String name = attribute.getNodeName();
+            int value = Integer.parseInt(attribute.getNodeValue());
+            updateScanRiskLevel(name, value);
+        }
     }
 
-    private String getValueOfTag(String tagName, Document document) {
-        NodeList tag = document.getElementsByTagName(tagName);
-        Node tagNode = tag.item(0);
-        return tagNode.getFirstChild().getNodeValue();
+    private void updateScanRiskLevel(String name, int value) {
+        switch (name) {
+            case Constants.AppScan.HIGH:
+                incrementMetric(Constants.AppScan.HIGH, value);
+                break;
+            case Constants.AppScan.MEDIUM:
+                incrementMetric(Constants.AppScan.MEDIUM, value);
+                break;
+            case Constants.AppScan.LOW:
+                incrementMetric(Constants.AppScan.LOW, value);
+                break;
+            case Constants.AppScan.INFORMATIONAL:
+                incrementMetric(Constants.AppScan.INFORMATIONAL, value);
+                break;
+            case Constants.AppScan.TOTAL:
+                incrementMetric(Constants.AppScan.TOTAL, value);
+                break;
+            default:
+                break;
+        }
     }
 
-    private String getValueOfNodeAttribute(NodeList xmlReportTag, String itemName) {
-        Node node = xmlReportTag.item(0);
-        return node.getAttributes().getNamedItem(itemName).getNodeValue();
+    private void incrementMetric(String name, int value) {
+        this.metrics.put(name, this.metrics.get(name) + value);
+    }
+
+    public String getScanDate(Document document) {
+        NodeList tagsWithDate = document.getElementsByTagName(SCAN_DATE);
+        Node nodeWithDate = tagsWithDate.item(0);
+        return nodeWithDate.getFirstChild().getNodeValue();
+    }
+
+    private String getValueOfNodeAttribute(Node tag, String itemName) {
+        return tag.getAttributes().getNamedItem(itemName).getNodeValue();
     }
 }

@@ -32,6 +32,8 @@ public class AppScanCollectorTaskTest{
     private static final String SERVER = "appscan-tests/test.xml";
     private static final String CRON = "0 0/1 * * * *";
     private static final String NAME = "test";
+    private static final String DATE = "2018-8-25";
+    private static final Long TIMESTAMP = (Long) 1535185027000L;
 
     @Before
     public void setup() {
@@ -49,7 +51,7 @@ public class AppScanCollectorTaskTest{
 
         client = new DefaultAppScanClient(settings);
         this.task = new AppScanCollectorTask(mockScheduler, mockCollectorRepository, mockProjectRepository,
-                mockRepository, client, settings, mockComponentRepository);
+                mockRepository, client, settings);
     }
 
     @Test
@@ -65,6 +67,7 @@ public class AppScanCollectorTaskTest{
         assertThat(collector.getAllFields().get("instanceUrl")).isEqualTo("");
         assertThat(collector.getAllFields().get("projectName")).isEqualTo("");
         assertThat(collector.getAllFields().get("projectTimestamp")).isEqualTo(null);
+        assertThat(collector.getAllFields().get("projectDate")).isEqualTo(null);
         assertThat(collector.getUniqueFields().get("instanceUrl")).isEqualTo("");
         assertThat(collector.getUniqueFields().get("projectName")).isEqualTo("");
     }
@@ -93,11 +96,9 @@ public class AppScanCollectorTaskTest{
         AppScanCollector collector = collectorWithServer();
         task.collect(collector);
         AppScanProject project = client.getProject();
-        StringBuilder name = new StringBuilder(project.getProjectName());
-        name.replace(4, name.length(), "");
-        assertEquals(name.toString(), NAME);
-        verify(mockProjectRepository).save(project);
-        verify(mockProjectRepository).findAppScanProject(collector.getId(), project.getProjectName(), project.getProjectTimestamp());
+        assertEquals(project.getProjectName(), NAME);
+        assertEquals(project.getProjectDate(), DATE);
+        assertEquals(project.getProjectTimestamp(), TIMESTAMP);
     }
 
     private ArrayList<com.capitalone.dashboard.model.Component> components() {
